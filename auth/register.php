@@ -1,8 +1,7 @@
 <?php
-session_start();
 require_once '../config.php';
 
-if(isset($_SESSION['user_id'])) {
+if(isset($_SESSION['user'])) {
     header('Location: ../index.php');
     exit;
 }
@@ -15,54 +14,49 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
     $confirm_password = trim($_POST['confirm_password']);
-    $role = 'user'; // Default role
 
     // Validate passwords match
     if($password !== $confirm_password) {
         $error = 'Las contraseñas no coinciden';
     } else {
-        try {
-            // Check if email already exists
-            $stmt = $conn->prepare("SELECT id FROM users WHERE email = :email");
-            $stmt->bindParam(':email', $email);
-            $stmt->execute();
-            
-            if($stmt->rowCount() > 0) {
+        $users = read_json_data(USERS_FILE);
+        
+        // Check if email exists
+        foreach($users as $user) {
+            if($user['email'] === $email) {
                 $error = 'Este correo electrónico ya está registrado';
-            } else {
-                // Check if username already exists
-                $stmt = $conn->prepare("SELECT id FROM users WHERE username = :username");
-                $stmt->bindParam(':username', $username);
-                $stmt->execute();
-                
-                if($stmt->rowCount() > 0) {
-                    $error = 'Este nombre de usuario ya está en uso';
-                } else {
-                    // Hash password
-                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                    
-                    // Insert new user
-                    $stmt = $conn->prepare("INSERT INTO users (username, email, password, role) VALUES (:username, :email, :password, :role)");
-                    $stmt->bindParam(':username', $username);
-                    $stmt->bindParam(':email', $email);
-                    $stmt->bindParam(':password', $hashed_password);
-                    $stmt->bindParam(':role', $role);
-                    $stmt->execute();
-                    
-                    $success = 'Registro exitoso. Redirigiendo...';
-                    
-                    // Auto-login after registration
-                    $user_id = $conn->lastInsertId();
-                    $_SESSION['user_id'] = $user_id;
-                    $_SESSION['username'] = $username;
-                    $_SESSION['role'] = $role;
-                    
-                    // Redirect after 2 seconds
-                    header("Refresh: 2; url=../index.php");
-                }
+                break;
             }
-        } catch(PDOException $e) {
-            $error = 'Error al registrar el usuario: ' . $e->getMessage();
+            if($user['username'] === $username) {
+                $error = 'Este nombre de usuario ya está en uso';
+                break;
+            }
+        }
+
+        if(empty($error)) {
+            // Hash password
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            
+            // Create new user
+            $new_user = [
+                'id' => uniqid(),
+                'username' => $username,
+                'email' => $email,
+                'password' => $hashed_password,
+                'role' => 'user',
+                'created_at' => date('Y-m-d H:i:s')
+            ];
+            
+            $users[] = $new_user;
+            save_json_data(USERS_FILE, $users);
+            
+            $success = 'Registro exitoso. Redirigiendo...';
+            
+            // Auto-login after registration
+            $_SESSION['user'] = $new_user;
+            
+            // Redirect after 2 seconds
+            header("Refresh: 2; url=../index.php");
         }
     }
 }

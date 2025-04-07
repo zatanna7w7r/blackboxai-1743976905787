@@ -44,25 +44,21 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'home';
                 </li>
 
                 <!-- Dynamic Courses Section -->
-                <?php if(isset($_SESSION['user_id'])): ?>
+                <?php if(isset($_SESSION['user'])): ?>
                     <li class="mt-8 pt-4 border-t border-purple-500">
                         <h3 class="px-3 py-2 text-sm font-semibold uppercase tracking-wider sidebar-text">Mis Cursos</h3>
                         <?php
-                        try {
-                            $stmt = $conn->prepare("SELECT * FROM courses WHERE user_id = :user_id");
-                            $stmt->bindParam(':user_id', $_SESSION['user_id']);
-                            $stmt->execute();
-                            
-                            while($course = $stmt->fetch(PDO::FETCH_ASSOC)): ?>
-                                <a href="?page=course&id=<?php echo $course['id']; ?>" class="flex items-center p-3 rounded-lg hover:bg-purple-700 transition">
-                                    <i class="fas fa-book mr-3 text-lg"></i>
-                                    <span class="sidebar-text"><?php echo htmlspecialchars($course['title']); ?></span>
-                                </a>
-                            <?php endwhile;
-                        } catch(PDOException $e) {
-                            // Handle error
-                        }
-                        ?>
+                        $courses = read_json_data(COURSES_FILE);
+                        $user_courses = array_filter($courses, function($course) {
+                            return $course['user_id'] === $_SESSION['user']['id'];
+                        });
+                        
+                        foreach($user_courses as $course): ?>
+                            <a href="?page=course&id=<?php echo $course['id']; ?>" class="flex items-center p-3 rounded-lg hover:bg-purple-700 transition">
+                                <i class="fas fa-book mr-3 text-lg"></i>
+                                <span class="sidebar-text"><?php echo htmlspecialchars($course['title']); ?></span>
+                            </a>
+                        <?php endforeach; ?>
                     </li>
                 <?php endif; ?>
             </ul>

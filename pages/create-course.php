@@ -1,8 +1,7 @@
 <?php
-session_start();
 require_once '../config.php';
 
-if(!isset($_SESSION['user_id'])) {
+if(!isset($_SESSION['user'])) {
     header('Location: ../auth/login.php');
     exit;
 }
@@ -14,20 +13,26 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $title = trim($_POST['title']);
     $description = trim($_POST['description']);
     $content = trim($_POST['content']);
-    $user_id = $_SESSION['user_id'];
-
-    try {
-        $stmt = $conn->prepare("INSERT INTO courses (title, description, content, user_id) VALUES (:title, :description, :content, :user_id)");
-        $stmt->bindParam(':title', $title);
-        $stmt->bindParam(':description', $description);
-        $stmt->bindParam(':content', $content);
-        $stmt->bindParam(':user_id', $user_id);
-        $stmt->execute();
-
+    
+    if(empty($title) || empty($description) || empty($content)) {
+        $error = 'Todos los campos son requeridos';
+    } else {
+        $courses = read_json_data(COURSES_FILE);
+        
+        $new_course = [
+            'id' => uniqid(),
+            'title' => $title,
+            'description' => $description,
+            'content' => $content,
+            'user_id' => $_SESSION['user']['id'],
+            'created_at' => date('Y-m-d H:i:s')
+        ];
+        
+        $courses[] = $new_course;
+        save_json_data(COURSES_FILE, $courses);
+        
         $success = 'Curso creado exitosamente! Serás redirigido...';
         header("Refresh: 2; url=../index.php");
-    } catch(PDOException $e) {
-        $error = 'Error al crear el curso: ' . $e->getMessage();
     }
 }
 ?>

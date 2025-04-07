@@ -1,8 +1,7 @@
 <?php
-session_start();
 require_once '../config.php';
 
-if(isset($_SESSION['user_id'])) {
+if(isset($_SESSION['user'])) {
     header('Location: ../index.php');
     exit;
 }
@@ -13,42 +12,24 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = trim($_POST['password']);
     $remember = isset($_POST['remember']);
 
-    try {
-        $stmt = $conn->prepare("SELECT * FROM users WHERE email = :email");
-        $stmt->bindParam(':email', $email);
-        $stmt->execute();
-        
-        if($stmt->rowCount() > 0) {
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $users = read_json_data(USERS_FILE);
+    
+    foreach($users as $user) {
+        if($user['email'] === $email && password_verify($password, $user['password'])) {
+            $_SESSION['user'] = $user;
             
-            if(password_verify($password, $user['password'])) {
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                $_SESSION['role'] = $user['role'];
-                
-                if($remember) {
-                    $token = bin2hex(random_bytes(32));
-                    $expiry = time() + 86400 * 30; // 30 days
-                    
-                    $stmt = $conn->prepare("UPDATE users SET remember_token = :token WHERE id = :id");
-                    $stmt->bindParam(':token', $token);
-                    $stmt->bindParam(':id', $user['id']);
-                    $stmt->execute();
-                    
-                    setcookie('remember', $token, $expiry, '/', '', true, true);
-                }
-                
-                header('Location: ../index.php');
-                exit;
-            } else {
-                $error = 'Credenciales incorrectas';
+            if($remember) {
+                $token = bin2hex(random_bytes(32));
+                setcookie('remember_token', $token, time() + 86400 * 30, '/', '', true, true);
+                $_SESSION['user']['remember_token'] = $token;
             }
-        } else {
-            $error = 'Credenciales incorrectas';
+            
+            header('Location: ../index.php');
+            exit;
         }
-    } catch(PDOException $e) {
-        $error = 'Error al iniciar sesión';
     }
+    
+    $error = 'Credenciales incorrectas';
 }
 ?>
 <!DOCTYPE html>
@@ -76,17 +57,11 @@ if($_SERVER['REQUEST_METHOD'] == 'POST') {
                         <div class="mb-4">
                             <label for="email" class="block text-gray-700 mb-2">Correo Electrónico</label>
                             <input type="email" id="email" name="email" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required>
-                            <div class="invalid-feedback text-red-500 text-sm">
-                                Por favor ingresa un correo electrónico válido
-                            </div>
                         </div>
                         
                         <div class="mb-4">
                             <label for="password" class="block text-gray-700 mb-2">Contraseña</label>
                             <input type="password" id="password" name="password" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" required>
-                            <div class="invalid-feedback text-red-500 text-sm">
-                                Por favor ingresa tu contraseña
-                            </div>
                         </div>
                         
                         <div class="mb-4 flex items-center">
